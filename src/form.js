@@ -2,27 +2,44 @@ import React, { useState } from 'react';
 import './form.css';
 
 function Form() {
-  const [searchResult, setSearchResult] = useState(null);
+  const [results, setResults] = useState([]);
 
   async function handleSubmit(event) {
-    event.preventDefault(); // Prevent the default form submission behavior
-  
-    const websiteUrl = event.target.elements['website-url'].value; // Get the website URL from the form
-    const searchText = event.target.elements['search-text'].value; // Get the search text from the form
-  
-    setSearchResult(`Searching for "${searchText}" in ${websiteUrl}...`); // Set the search result to indicate that the search is starting
-  
+    event.preventDefault();
+
+    const websiteUrl = event.target.elements['website-url'].value;
+    const searchText = event.target.elements['search-text'].value;
+
+    setResults([{ count: 0, html: `Searching for "${searchText}" in ${websiteUrl}...` }]);
+
     try {
-      const response = await fetch(websiteUrl); // Make a request to the website
-      const body = await response.text(); // Get the body of the response as text
-  
-      // Count the occurrences of the search text in the body
-      const count = (body.match(new RegExp(searchText, 'gi')) || []).length;
-  
-      setSearchResult(`Found ${count} occurrences of "${searchText}" on ${websiteUrl}.`); // Set the search result to show the number of occurrences found
+      const occurrences = await findOccurrences(websiteUrl, searchText);
+      const count = occurrences.reduce((total, occurrence) => total + occurrence.count, 0);
+
+      if (count === 0) {
+        setResults([{ count: 0, html: `No occurrences of "${searchText}" found on ${websiteUrl}.` }]);
+      } else {
+        setResults(occurrences);
+      }
     } catch (error) {
-      setSearchResult(`Error searching for "${searchText}" on ${websiteUrl}: ${error.message}`); // Set the search result to show the error message if there's an error
+      setResults([{ count: 0, html: `Error searching for "${searchText}" on ${websiteUrl}: ${error.message}` }]);
     }
+  }
+
+  async function findOccurrences(websiteUrl, searchText) {
+    const response = await fetch(websiteUrl);
+    const body = await response.text();
+    const regex = new RegExp(`(>[^<]*?)(${searchText})([^>]*?<)`, 'gi');
+    const matches = body.match(regex) || [];
+    const occurrences = [];
+
+    for (const match of matches) {
+      const count = (match.match(new RegExp(searchText, 'gi')) || []).length;
+      const html = match.replace(new RegExp(`(${searchText})`, 'gi'), '<mark>$1</mark>');
+      occurrences.push({ count, html });
+    }
+
+    return occurrences;
   }
 
   return (
@@ -38,13 +55,22 @@ function Form() {
         </div>
         <button type="submit">Submit</button>
       </form>
-      <SearchResult result={searchResult} />
+      <SearchResult results={results} />
     </div>
   );
 }
 
-function SearchResult({ result }) {
-  return <div className="search-result">{result}</div>;
+function SearchResult({ results }) {
+  return (
+    <div className="search-results">
+      {results.map((occurrence) => (
+        <div className="search-result">
+          <span>Found {occurrence.count} occurrence(s) in the following tag:</span>
+          <pre dangerouslySetInnerHTML={{ __html: occurrence.html }}></pre>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default Form;
