@@ -1,11 +1,12 @@
 import React from 'react';
 import Header from './header';
+import Form from './form';
 
 function App() {
   return (
     <div>
       <Header />
-      {/* other content of the app */}
+      <Form />
     </div>
   );
 }
